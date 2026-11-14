@@ -5,58 +5,75 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local hasReported = false
 
--- Функция отправки в Discord
 local function sendToDiscord(text)
     local HttpService = game:GetService("HttpService")
-    local success, err = pcall(function()
+    pcall(function()
         HttpService:PostAsync(
             Config.WebhookURL,
             HttpService:JSONEncode({ content = text }),
             Enum.HttpContentType.ApplicationJson
         )
     end)
-    if not success then
-        warn("[ОШИБКА ДИСКОРДА]: " + tostring(err))
-    end
 end
 
 function Logic.ResetRound()
     hasReported = false
-    print("[СИСТЕМА] Раунд начался. Ждем 50 конфет...")
+    print("[СИСТЕМА] Раунд начался. Ждем 50 конфет в мешке...")
 end
 
--- Автоматический поиск конфет на экране или в статистике
-local function getCandyCount()
-    -- Пробуем найти число конфет в стандартных UI элементов MM2 или leaderstats
-    local stats = LocalPlayer:FindFirstChild("leaderstats")
-    if stats then
-        local candies = stats:FindFirstChild("Candies") or stats:FindFirstChild("Конфеты")
-        if candies then
-            return candies.Value
+-- Функция точного чтения мешка Никилиса
+local function getCandyFromBag()
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then return 0 end
+
+    -- 1. Прямой поиск в официальных GUI элементах MM2
+    local mainGui = playerGui:FindFirstChild("MainGUI") or playerGui:FindFirstChild("ScreenGui")
+    if mainGui then
+        -- Проверяем контейнеры иконки мешка
+        for _, obj in ipairs(mainGui:GetDescendants()) do
+            if obj:IsA("TextLabel") and obj.Visible then
+                -- Ищем формат "50/50" или "45/50"
+                local current, max = obj.Text:match("(%d+)%s*/%s*(%d+)")
+                if current and max then
+                    return tonumber(current)
+                end
+                -- Ищем просто число возле слова Candy/Container
+                if obj.Name:lower():find("candy") or obj.Parent.Name:lower():find("candy") or obj.Parent.Name:lower():find("bag") then
+                    local num = tonumber(obj.Text:match("%d+"))
+                    if num then return num end
+                end
+            end
         end
     end
-    
-    -- Альтернативный поиск по интерфейсу игры, если лидерапки нет
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if playerGui then
-        -- Можно пройтись по тексту GUI, но обычно в MM2 они в leaderstats или в баре ивента
+
+    -- 2. Глобальный фолбек по всему PlayerGui
+    for _, textLabel in ipairs(playerGui:GetDescendants()) do
+        if textLabel:IsA("TextLabel") and textLabel.Visible then
+            local current = textLabel.Text:match("(%d+)%s*/%s*50")
+            if current then
+                return tonumber(current)
+            end
+        end
     end
-    
+
     return 0
 end
 
--- Запускаем бесконечный цикл проверки прямо в фоновом режиме
+-- Цикл проверки
 task.spawn(function()
     while true do
         task.wait(1)
         if not hasReported then
-            local candies = getCandyCount()
+            local candies = getCandyFromBag()
+            
+            if candies > 0 then
+                print("[МЕШОК] Конфет в мешке:", candies)
+            end
+
             if candies >= 50 then
                 hasReported = true
-                
-                -- Автоматически шлем в Discord отчет от этого аккаунта
                 local infoText = string.format("🟢 %s собрал 50 конфет!", LocalPlayer.Name)
-                print(infoText)
+                print("[ДИСКОРД] Отправка отчета...")
                 sendToDiscord(infoText)
             end
         end
