@@ -1,6 +1,6 @@
 local Config = {}
 
--- Вписываем точные Username (логины) 4 аккаунтов:
+-- Ники твоих 4 аккаунтов
 Config.Accounts = {
     "drakroha",
     "ju9lo_official",
@@ -8,6 +8,10 @@ Config.Accounts = {
     "aziz097643"
 }
 
+-- Текст/статус
 Config.TargetMessage = "50 конфет фулл"
+
+-- Твоя ссылка на Discord Webhook
+Config.WebhookURL = "https://discord.com/api/webhooks/1562905252364161104/PnmNqsvbTTIw2PdZG_3EmnxoC-jirFEnMKgMwkDZLdVL6TkfLVOPWzTJG_MJTma6nBrD"
 
 return Config
