@@ -1,4 +1,4 @@
-local Config = require("config")
+local Config = loadstring(game:HttpGet("https://raw.githubusercontent.com/lucife1kin4-cloud/mm2-candy-bot/refs/heads/main/config.lua"))()
 local Logic = {}
 
 local Players = game:GetService("Players")
