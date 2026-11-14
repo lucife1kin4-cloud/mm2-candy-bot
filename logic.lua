@@ -1,46 +1,64 @@
 local Config = require("config")
 local Logic = {}
 
--- Таблица для отслеживания тех, кто уже написал в текущем раунде
 local completedAccounts = {}
 
--- Функция сброса раунда (обнуляет список)
+-- Функция сброса раунда
 function Logic.ResetRound()
     completedAccounts = {}
-    print("[СИСТЕМА] Раунд начался. Ожидание сообщений от 4 аккаунтов...")
+    print("[СИСТЕМА] Раунд начался. Ожидание готовности 4 аккаунтов...")
 end
 
--- Функция проверки входящего сообщения из чата
-function Logic.ProcessMessage(senderUsername, messageText)
+-- Функция отправки сообщения в твой Discord через вебхук
+local function sendToDiscord(text)
+    local HttpService = game:GetService("HttpService")
     
-    -- 1. Проверяем, есть ли отправитель в нашем списке разрешенных 4 аккаунтов
+    local data = {
+        content = text
+    }
+    
+    local success, err = pcall(function()
+        HttpService:PostAsync(
+            Config.WebhookURL,
+            HttpService:JSONEncode(data),
+            Enum.HttpContentType.ApplicationJson
+        )
+    end)
+    
+    if not success then
+        warn("[ОШИБКА ДИСКОРДА]: " .. tostring(err))
+    end
+end
+
+-- Обработка отчета от аккаунта
+function Logic.ReportReady(accountName, messageText)
+    -- Проверяем, наш ли это аккаунт
     local isMyAccount = false
     for _, acc in ipairs(Config.Accounts) do
-        if acc == senderUsername then
+        if acc == accountName then
             isMyAccount = true
             break
         end
     end
 
-    -- Если сообщение написал кто-то посторонний — игнорируем
     if not isMyAccount then return end
 
-    -- 2. Проверяем текст сообщения
     if messageText == Config.TargetMessage then
-        
-        -- Если этот аккаунт еще не отмечался в этом раунде
-        if not completedAccounts[senderUsername] then
-            completedAccounts[senderUsername] = true
+        if not completedAccounts[accountName] then
+            completedAccounts[accountName] = true
 
-            -- Считаем, сколько аккаунтов уже отписалось
             local count = 0
             for _ in pairs(completedAccounts) do
                 count = count + 1
             end
 
-            print(string.format("[ПРОГРЕСС] %s написал фулл. Готово: %d/4", senderUsername, count))
+            local infoText = string.format("🟢 %s сообщил: %s (%d/4)", accountName, messageText, count)
+            print(infoText)
+            
+            -- Отправляем статус в Discord канал
+            sendToDiscord(infoText)
 
-            -- 3. ГЛАВНОЕ УСЛОВИЕ: Проверяем, набралось ли ровно 4 человека
+            -- ГЛАВНОЕ УСЛОВИЕ: Когда все четверо готовы
             if count >= #Config.Accounts then
                 Logic.TriggerAction()
             end
@@ -48,13 +66,14 @@ function Logic.ProcessMessage(senderUsername, messageText)
     end
 end
 
--- Функция, которая сработает, когда ВСЕ ЧЕТВЕРО напишут фразу
+-- Когда все собрались
 function Logic.TriggerAction()
-    print("[УСПЕХ] Все четверо написали фулл! Аккаунт с ножом делает резат.")
+    local successText = "🚀 Все 4 аккаунта написали фулл! Аккаунт с ножом делает резат."
+    print(successText)
+    sendToDiscord(successText)
     
-    -- === СЮДА ПОЗЖЕ ДОБАВИМ КОМАНДУ ДЛЯ РЕЗАТА УБИЙЦЫ ===
-    
-    -- Автоматически сбрасываем раунд для следующего раза
+    -- === СЮДА ПОЗЖЕ ВСТАВИМ КОМАНДУ ДЛЯ РЕЗАТА ===
+
     Logic.ResetRound()
 end
 
